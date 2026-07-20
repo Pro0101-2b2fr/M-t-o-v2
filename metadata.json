@@ -1,0 +1,6 @@
+{
+  "name": "Météo",
+  "description": "Application météo comparative multi-sources avec calcul de fiabilité, gestion intelligente des quotas API, géolocalisation et widgets personnalisables.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
