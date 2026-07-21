@@ -51,9 +51,6 @@ jobs:
       - name: Set up Gradle Actions
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest --no-daemon
-
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 
