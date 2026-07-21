@@ -5,6 +5,9 @@ import androidx.room.PrimaryKey
 
 enum class WeatherSource(val displayName: String, val requiresKey: Boolean, val defaultDailyLimit: Int) {
     OPEN_METEO("Open-Meteo", false, 10000),
+    METEO_FRANCE("Météo-France", false, 10000),
+    DWD_ICON("DWD (Allemagne)", false, 10000),
+    NCEP_GFS("NCEP GFS (USA)", false, 10000),
     OPEN_WEATHER_MAP("OpenWeatherMap", true, 1000),
     WEATHER_API("WeatherAPI", true, 1000),
     TOMORROW_IO("Tomorrow.io", true, 500)

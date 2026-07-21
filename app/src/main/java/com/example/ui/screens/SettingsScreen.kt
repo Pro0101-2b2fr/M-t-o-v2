@@ -452,7 +452,7 @@ fun ApiSourceConfigRow(
     onToggle: (Boolean) -> Unit,
     onSaveKey: (String) -> Unit
 ) {
-    val isEnabled = settings.enabledSources[source] ?: (source == WeatherSource.OPEN_METEO)
+    val isEnabled = settings.enabledSources[source] ?: !source.requiresKey
     val quotaCalls = settings.quotaCalls[source] ?: 0
     val quotaLimit = source.defaultDailyLimit
     val isQuotaDisabled = settings.quotaDisabled[source] ?: false

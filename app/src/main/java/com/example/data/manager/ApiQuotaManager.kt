@@ -70,7 +70,7 @@ class ApiQuotaManager(private val context: Context) {
         }
 
         val enabledSources = WeatherSource.values().associateWith { source ->
-            prefs[getSourceEnabledPreference(source)] ?: (source == WeatherSource.OPEN_METEO)
+            prefs[getSourceEnabledPreference(source)] ?: !source.requiresKey
         }
 
         val apiKeys = WeatherSource.values().associateWith { source ->
@@ -223,7 +223,7 @@ data class AppSettings(
     val apiKeys: Map<WeatherSource, String>
 ) {
     fun isSourceActive(source: WeatherSource): Boolean {
-        val userEnabled = enabledSources[source] ?: (source == WeatherSource.OPEN_METEO)
+        val userEnabled = enabledSources[source] ?: !source.requiresKey
         val hasKey = !source.requiresKey || !apiKeys[source].isNullOrBlank()
         val quotaExceeded = quotaDisabled[source] ?: false
         return userEnabled && hasKey && !quotaExceeded

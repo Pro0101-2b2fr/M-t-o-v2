@@ -15,6 +15,36 @@ interface OpenMeteoService {
         @Query("timezone") timezone: String = "auto"
     ): OpenMeteoResponse
 
+    @GET("meteofrance")
+    suspend fun getMeteoFranceForecast(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lon: Double,
+        @Query("current") current: String = "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,pressure_msl,wind_speed_10m,wind_direction_10m,uv_index",
+        @Query("hourly") hourly: String = "temperature_2m,relative_humidity_2m,weather_code,precipitation_probability",
+        @Query("daily") daily: String = "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max",
+        @Query("timezone") timezone: String = "auto"
+    ): OpenMeteoResponse
+
+    @GET("dwd-icon")
+    suspend fun getDwdIconForecast(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lon: Double,
+        @Query("current") current: String = "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,pressure_msl,wind_speed_10m,wind_direction_10m,uv_index",
+        @Query("hourly") hourly: String = "temperature_2m,relative_humidity_2m,weather_code,precipitation_probability",
+        @Query("daily") daily: String = "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max",
+        @Query("timezone") timezone: String = "auto"
+    ): OpenMeteoResponse
+
+    @GET("gfs")
+    suspend fun getGfsForecast(
+        @Query("latitude") lat: Double,
+        @Query("longitude") lon: Double,
+        @Query("current") current: String = "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,pressure_msl,wind_speed_10m,wind_direction_10m,uv_index",
+        @Query("hourly") hourly: String = "temperature_2m,relative_humidity_2m,weather_code,precipitation_probability",
+        @Query("daily") daily: String = "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max",
+        @Query("timezone") timezone: String = "auto"
+    ): OpenMeteoResponse
+
     @GET("https://air-quality-api.open-meteo.com/v1/forecast")
     suspend fun getAirQuality(
         @Query("latitude") lat: Double,

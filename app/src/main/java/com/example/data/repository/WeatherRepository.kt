@@ -184,6 +184,20 @@ class WeatherRepository(
             return baseWeather
         }
 
+        // Direct real keyless API calls
+        if (source == WeatherSource.METEO_FRANCE) {
+            val response = openMeteoService.getMeteoFranceForecast(lat, lon)
+            return mapOpenMeteoToUnified(response, pmAqi, cityName).copy(source = WeatherSource.METEO_FRANCE)
+        }
+        if (source == WeatherSource.DWD_ICON) {
+            val response = openMeteoService.getDwdIconForecast(lat, lon)
+            return mapOpenMeteoToUnified(response, pmAqi, cityName).copy(source = WeatherSource.DWD_ICON)
+        }
+        if (source == WeatherSource.NCEP_GFS) {
+            val response = openMeteoService.getGfsForecast(lat, lon)
+            return mapOpenMeteoToUnified(response, pmAqi, cityName).copy(source = WeatherSource.NCEP_GFS)
+        }
+
         val apiKey = settings.apiKeys[source] ?: ""
         
         // If API key is available, run real network call
