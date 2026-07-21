@@ -114,8 +114,9 @@ class WeatherRepository(
                     Log.e("WeatherRepo", "Error parsing cache: ${e.message}")
                 }
             }
+            val detailMsg = sourceErrors.entries.joinToString("; ") { "${it.key.displayName}: ${it.value}" }
             throw Exception("Aucune source météo n'a répondu et aucun cache n'est disponible. " +
-                    "Veuillez vérifier votre connexion Internet.")
+                    "Veuillez vérifier votre connexion Internet.\n\nDétails :\n$detailMsg")
         }
 
         // 3. Calculate Average/Consensus Weather

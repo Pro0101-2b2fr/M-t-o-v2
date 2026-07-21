@@ -30,6 +30,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
 
@@ -45,17 +47,21 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     private val okHttpClient = OkHttpClient.Builder().build()
     
+    private val moshi = Moshi.Builder()
+        .addLast(KotlinJsonAdapterFactory())
+        .build()
+    
     private val openMeteoService = Retrofit.Builder()
         .baseUrl("https://api.open-meteo.com/v1/")
         .client(okHttpClient)
-        .addConverterFactory(MoshiConverterFactory.create())
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
         .create(OpenMeteoService::class.java)
 
     private val externalService = Retrofit.Builder()
         .baseUrl("https://api.openweathermap.org/data/2.5/")
         .client(okHttpClient)
-        .addConverterFactory(MoshiConverterFactory.create())
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
         .create(ExternalWeatherService::class.java)
 
