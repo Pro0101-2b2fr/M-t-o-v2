@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -51,7 +52,7 @@ fun DashboardScreen(
     val settings by viewModel.appSettings.collectAsState()
     val selectedCity by viewModel.selectedCity.collectAsState()
 
-    val backgroundGradient = getBackgroundGradient(uiState)
+    val backgroundGradient = getBackgroundGradient(uiState, settings)
 
     Scaffold(
         topBar = {
@@ -85,7 +86,8 @@ fun DashboardScreen(
                         }
                         Icon(
                             imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = "Changer de ville"
+                            contentDescription = "Changer de ville",
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
@@ -94,13 +96,21 @@ fun DashboardScreen(
                         onClick = { viewModel.loadWeather() },
                         modifier = Modifier.testTag("refresh_button")
                     ) {
-                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Actualiser")
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Actualiser",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.testTag("settings_button")
                     ) {
-                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Réglages")
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Réglages",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -332,7 +342,7 @@ fun MainConsensusCard(result: ComparativeWeatherResult, settings: AppSettings) {
             Text(
                 text = "Ressenti : $feelsLikeText",
                 fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -389,7 +399,7 @@ fun QuickInfoItem(icon: ImageVector, label: String, value: String) {
         Text(
             text = label,
             fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
         )
     }
 }
@@ -432,7 +442,7 @@ fun ReliabilityDiagnosticCard(result: ComparativeWeatherResult) {
                 Text(
                     text = description,
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
                 )
             }
         }
@@ -535,7 +545,7 @@ fun ComparativeGridCard(result: ComparativeWeatherResult, settings: AppSettings)
 
                         val devValue = deviation?.temperatureDeviation ?: 0f
                         val devSign = if (devValue >= 0) "+" else ""
-                        val devColor = if (isUnreliable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        val devColor = if (isUnreliable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                         
                         Text(
                             text = "Écart: $devSign${"%.1f".format(devValue)}°C",
@@ -611,7 +621,7 @@ fun SourceDetailRow(label: String, value: String) {
             .padding(vertical = 1.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+        Text(text = label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
         Text(text = value, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
     }
 }
@@ -646,7 +656,7 @@ fun HourlyForecastCard(result: ComparativeWeatherResult, settings: AppSettings) 
                         Text(
                             text = hour.time,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Icon(
@@ -1213,25 +1223,55 @@ fun getWeatherIconColor(iconName: String): Color {
 }
 
 @Composable
-fun getBackgroundGradient(uiState: WeatherUiState): Brush {
-    val lightBlue = Color(0xFFE0F7FA)
-    val darkBlue = Color(0xFF80DEEA)
-    
-    val graySky = Color(0xFFECEFF1)
-    val stormSky = Color(0xFFCFD8DC)
+fun getBackgroundGradient(uiState: WeatherUiState, settings: AppSettings): Brush {
+    val darkTheme = when (settings.themeMode) {
+        "light" -> false
+        "dark" -> true
+        else -> isSystemInDarkTheme()
+    }
 
-    val sunsetAmber = Color(0xFFFFE0B2)
-    val orangeSky = Color(0xFFFFCC80)
+    val (color1, color2) = if (darkTheme) {
+        // High-contrast deep elegant dark themes for maximum readability
+        val deepNightBlue = Color(0xFF090D1A)
+        val spaceBlack = Color(0xFF03050A)
+        
+        val darkStormBlue = Color(0xFF0E1422)
+        val darkAbyss = Color(0xFF05080E)
 
-    val (color1, color2) = when (uiState) {
-        is WeatherUiState.Success -> {
-            when (uiState.data.averageWeather.conditionIcon) {
-                "sunny" -> sunsetAmber to orangeSky
-                "rainy", "thunderstorm" -> stormSky to graySky
-                else -> lightBlue to darkBlue
+        val twilightAmber = Color(0xFF1D130A)
+        val shadowDusk = Color(0xFF0A0704)
+
+        when (uiState) {
+            is WeatherUiState.Success -> {
+                when (uiState.data.averageWeather.conditionIcon) {
+                    "sunny" -> twilightAmber to shadowDusk
+                    "rainy", "thunderstorm" -> darkStormBlue to darkAbyss
+                    else -> deepNightBlue to spaceBlack
+                }
             }
+            else -> deepNightBlue to spaceBlack
         }
-        else -> lightBlue to darkBlue
+    } else {
+        // High-contrast, fresh light theme gradients
+        val lightBlue = Color(0xFFD9F4F6)
+        val darkBlue = Color(0xFF70CFDC)
+        
+        val graySky = Color(0xFFE5E9EC)
+        val stormSky = Color(0xFFB0BEC5)
+
+        val sunsetAmber = Color(0xFFFFF1D6)
+        val orangeSky = Color(0xFFFFCC80)
+
+        when (uiState) {
+            is WeatherUiState.Success -> {
+                when (uiState.data.averageWeather.conditionIcon) {
+                    "sunny" -> sunsetAmber to orangeSky
+                    "rainy", "thunderstorm" -> stormSky to graySky
+                    else -> lightBlue to darkBlue
+                }
+            }
+            else -> lightBlue to darkBlue
+        }
     }
 
     return Brush.verticalGradient(

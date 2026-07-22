@@ -55,51 +55,51 @@ interface OpenMeteoService {
 
 // Open-Meteo Weather Response DTOs
 data class OpenMeteoResponse(
-    val latitude: Double,
-    val longitude: Double,
-    val current: CurrentWeatherDto?,
-    val hourly: HourlyForecastDto?,
-    val daily: DailyForecastDto?
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val current: CurrentWeatherDto? = null,
+    val hourly: HourlyForecastDto? = null,
+    val daily: DailyForecastDto? = null
 )
 
 data class CurrentWeatherDto(
-    val time: String,
-    val temperature_2m: Float,
-    val relative_humidity_2m: Int,
-    val apparent_temperature: Float,
-    val precipitation: Float,
-    val weather_code: Int,
-    val pressure_msl: Float,
-    val wind_speed_10m: Float,
-    val wind_direction_10m: Float,
-    val uv_index: Float
+    val time: String? = null,
+    val temperature_2m: Float? = null,
+    val relative_humidity_2m: Int? = null,
+    val apparent_temperature: Float? = null,
+    val precipitation: Float? = null,
+    val weather_code: Int? = null,
+    val pressure_msl: Float? = null,
+    val wind_speed_10m: Float? = null,
+    val wind_direction_10m: Float? = null,
+    val uv_index: Float? = null
 )
 
 data class HourlyForecastDto(
-    val time: List<String>,
-    val temperature_2m: List<Float>,
-    val relative_humidity_2m: List<Int>,
-    val weather_code: List<Int>,
-    val precipitation_probability: List<Int>
+    val time: List<String>? = null,
+    val temperature_2m: List<Float>? = null,
+    val relative_humidity_2m: List<Int>? = null,
+    val weather_code: List<Int>? = null,
+    val precipitation_probability: List<Int>? = null
 )
 
 data class DailyForecastDto(
-    val time: List<String>,
-    val weather_code: List<Int>,
-    val temperature_2m_max: List<Float>,
-    val temperature_2m_min: List<Float>,
-    val sunrise: List<String>,
-    val sunset: List<String>,
-    val uv_index_max: List<Float>,
-    val precipitation_probability_max: List<Int>
+    val time: List<String>? = null,
+    val weather_code: List<Int>? = null,
+    val temperature_2m_max: List<Float>? = null,
+    val temperature_2m_min: List<Float>? = null,
+    val sunrise: List<String>? = null,
+    val sunset: List<String>? = null,
+    val uv_index_max: List<Float>? = null,
+    val precipitation_probability_max: List<Int>? = null
 )
 
 // Open-Meteo Air Quality Response DTOs
 data class OpenMeteoAqiResponse(
-    val current: CurrentAqiDto?
+    val current: CurrentAqiDto? = null
 )
 
 data class CurrentAqiDto(
-    val time: String,
-    val european_aqi: Int
+    val time: String? = null,
+    val european_aqi: Int? = null
 )

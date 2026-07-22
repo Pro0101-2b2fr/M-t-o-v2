@@ -297,7 +297,7 @@ class WeatherRepository(
         val currentDto = response.current ?: throw Exception("Données actuelles Open-Meteo absentes")
         val hourlyDto = response.hourly
         val dailyDto = response.daily
-
+ 
         val aqiRaw = aqiResponse?.current?.european_aqi ?: 25
         val mappedAqi = when {
             aqiRaw <= 20 -> 1 // Excellent
@@ -306,67 +306,80 @@ class WeatherRepository(
             aqiRaw <= 80 -> 4 // Mauvais
             else -> 5 // Très mauvais
         }
-
-        val conditionText = mapWmoCodeToText(currentDto.weather_code)
-        val conditionIcon = mapWmoCodeToIcon(currentDto.weather_code)
-
+ 
+        val conditionText = mapWmoCodeToText(currentDto.weather_code ?: 0)
+        val conditionIcon = mapWmoCodeToIcon(currentDto.weather_code ?: 0)
+ 
         val currentCond = WeatherCondition(
-            temperature = currentDto.temperature_2m,
-            feelsLike = currentDto.apparent_temperature,
-            humidity = currentDto.relative_humidity_2m,
-            windSpeed = currentDto.wind_speed_10m,
-            windDirection = currentDto.wind_direction_10m,
-            pressure = currentDto.pressure_msl,
-            uvIndex = currentDto.uv_index,
+            temperature = currentDto.temperature_2m ?: 0f,
+            feelsLike = currentDto.apparent_temperature ?: (currentDto.temperature_2m ?: 0f),
+            humidity = currentDto.relative_humidity_2m ?: 0,
+            windSpeed = currentDto.wind_speed_10m ?: 0f,
+            windDirection = currentDto.wind_direction_10m ?: 0f,
+            pressure = currentDto.pressure_msl ?: 1013f,
+            uvIndex = currentDto.uv_index ?: 0f,
             aqi = mappedAqi,
-            precipitationProb = if (!hourlyDto?.precipitation_probability.isNullOrEmpty()) hourlyDto!!.precipitation_probability[0] else 0,
-            precipitationQty = currentDto.precipitation,
-            sunrise = if (!dailyDto?.sunrise.isNullOrEmpty()) formatSunTime(dailyDto!!.sunrise[0]) else "06:00",
-            sunset = if (!dailyDto?.sunset.isNullOrEmpty()) formatSunTime(dailyDto!!.sunset[0]) else "21:00",
+            precipitationProb = if (!hourlyDto?.precipitation_probability.isNullOrEmpty() && hourlyDto?.precipitation_probability?.get(0) != null) hourlyDto.precipitation_probability[0]!! else 0,
+            precipitationQty = currentDto.precipitation ?: 0f,
+            sunrise = if (!dailyDto?.sunrise.isNullOrEmpty() && dailyDto?.sunrise?.get(0) != null) formatSunTime(dailyDto.sunrise[0]!!) else "06:00",
+            sunset = if (!dailyDto?.sunset.isNullOrEmpty() && dailyDto?.sunset?.get(0) != null) formatSunTime(dailyDto.sunset[0]!!) else "21:00",
             conditionText = conditionText,
             conditionIcon = conditionIcon
         )
-
+ 
         // Hourly (next 24 hours)
         val hourlyList = mutableListOf<ForecastHour>()
         if (hourlyDto != null) {
-            val limit = minOf(hourlyDto.time.size, 24)
-            for (i in 0 until limit) {
-                hourlyList.add(
-                    ForecastHour(
-                        time = formatHourlyTime(hourlyDto.time[i]),
-                        temp = hourlyDto.temperature_2m[i],
-                        conditionIcon = mapWmoCodeToIcon(hourlyDto.weather_code[i]),
-                        precipitationProb = hourlyDto.precipitation_probability[i]
+            val times = hourlyDto.time
+            val temps = hourlyDto.temperature_2m
+            val codes = hourlyDto.weather_code
+            val probs = hourlyDto.precipitation_probability
+            if (times != null && temps != null && codes != null && probs != null) {
+                val limit = minOf(times.size, temps.size, codes.size, probs.size, 24)
+                for (i in 0 until limit) {
+                    hourlyList.add(
+                        ForecastHour(
+                            time = times[i]?.let { formatHourlyTime(it) } ?: "00:00",
+                            temp = temps[i] ?: 0f,
+                            conditionIcon = mapWmoCodeToIcon(codes[i] ?: 0),
+                            precipitationProb = probs[i] ?: 0
+                        )
                     )
-                )
+                }
             }
         }
-
+ 
         // Daily (next 7 days)
         val dailyList = mutableListOf<ForecastDay>()
         if (dailyDto != null) {
-            val limit = minOf(dailyDto.time.size, 7)
-            for (i in 0 until limit) {
-                dailyList.add(
-                    ForecastDay(
-                        date = formatDailyDate(dailyDto.time[i]),
-                        minTemp = dailyDto.temperature_2m_min[i],
-                        maxTemp = dailyDto.temperature_2m_max[i],
-                        conditionIcon = mapWmoCodeToIcon(dailyDto.weather_code[i]),
-                        precipitationProb = dailyDto.precipitation_probability_max[i],
-                        conditionText = mapWmoCodeToText(dailyDto.weather_code[i])
+            val times = dailyDto.time
+            val minTemps = dailyDto.temperature_2m_min
+            val maxTemps = dailyDto.temperature_2m_max
+            val codes = dailyDto.weather_code
+            val probs = dailyDto.precipitation_probability_max
+            if (times != null && minTemps != null && maxTemps != null && codes != null && probs != null) {
+                val limit = minOf(times.size, minTemps.size, maxTemps.size, codes.size, probs.size, 7)
+                for (i in 0 until limit) {
+                    dailyList.add(
+                        ForecastDay(
+                            date = times[i]?.let { formatDailyDate(it) } ?: "Jour",
+                            minTemp = minTemps[i] ?: 0f,
+                            maxTemp = maxTemps[i] ?: 0f,
+                            conditionIcon = mapWmoCodeToIcon(codes[i] ?: 0),
+                            precipitationProb = probs[i] ?: 0,
+                            conditionText = mapWmoCodeToText(codes[i] ?: 0)
+                        )
                     )
-                )
+                }
             }
         }
-
+ 
         return UnifiedWeather(
             source = WeatherSource.OPEN_METEO,
             timestamp = System.currentTimeMillis(),
             cityName = cityName,
-            latitude = response.latitude,
-            longitude = response.longitude,
+            latitude = response.latitude ?: 0.0,
+            longitude = response.longitude ?: 0.0,
             current = currentCond,
             hourly = hourlyList,
             daily = dailyList,
