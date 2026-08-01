@@ -58,6 +58,16 @@ interface ExternalWeatherService {
         @Query("apikey") apiKey: String,
         @Query("units") units: String = "metric"
     ): TomorrowForecastResponse
+
+    // MET Norway Sunrise
+    @GET
+    @Headers("User-Agent: MeteoCompare/1.0 github.com/Pro0101-2b2fr")
+    suspend fun getMetNorwaySunrise(
+        @Url url: String,
+        @Query("lat") lat: Double,
+        @Query("lon") lon: Double,
+        @Query("date") date: String
+    ): MetNorwaySunriseResponse
 }
 
 // ------------------- OpenWeatherMap DTOs -------------------
@@ -259,4 +269,18 @@ data class MetNorwayNextDetails(
     val precipitation_amount: Float? = null,
     val probability_of_precipitation: Float? = null
 )
+
+data class MetNorwaySunriseResponse(
+    val properties: MetNorwaySunriseProperties?
+)
+
+data class MetNorwaySunriseProperties(
+    val sunrise: MetNorwaySunEvent?,
+    val sunset: MetNorwaySunEvent?
+)
+
+data class MetNorwaySunEvent(
+    val time: String?
+)
+
 

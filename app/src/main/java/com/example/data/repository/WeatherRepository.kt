@@ -28,7 +28,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.random.Random
 
 class WeatherRepository(
     private val openMeteoService: OpenMeteoService,
@@ -162,7 +161,6 @@ class WeatherRepository(
         return@withContext comparativeResult
     }
 
-    // Call individual API endpoints or generate highly realistic offsets if keys are absent but we want visual comparison
     private suspend fun fetchFromSource(
         source: WeatherSource,
         lat: Double,
@@ -211,7 +209,7 @@ class WeatherRepository(
 
         val apiKey = settings.apiKeys[source] ?: ""
         
-        // If API key is missing, throw clear exception (no simulated replacement data)
+        // If API key is missing, throw clear exception
         if (apiKey.isBlank()) {
             throw Exception("Clé API manquante dans les réglages")
         }
@@ -256,13 +254,15 @@ class WeatherRepository(
         val hourlyDto = response.hourly
         val dailyDto = response.daily
  
-        val aqiRaw = aqiResponse?.current?.european_aqi ?: 25
-        val mappedAqi = when {
-            aqiRaw <= 20 -> 1 // Excellent
-            aqiRaw <= 40 -> 2 // Beau
-            aqiRaw <= 60 -> 3 // Modéré
-            aqiRaw <= 80 -> 4 // Mauvais
-            else -> 5 // Très mauvais
+        val aqiRaw = aqiResponse?.current?.european_aqi
+        val mappedAqi = aqiRaw?.let {
+            when {
+                it <= 20 -> 1
+                it <= 40 -> 2
+                it <= 60 -> 3
+                it <= 80 -> 4
+                else -> 5
+            }
         }
  
         val conditionText = mapWmoCodeToText(currentDto.weather_code ?: 0)
@@ -275,7 +275,7 @@ class WeatherRepository(
             windSpeed = currentDto.wind_speed_10m ?: 0f,
             windDirection = currentDto.wind_direction_10m ?: 0f,
             pressure = currentDto.pressure_msl ?: 1013f,
-            uvIndex = currentDto.uv_index ?: 0f,
+            uvIndex = currentDto.uv_index,
             aqi = mappedAqi,
             precipitationProb = if (!hourlyDto?.precipitation_probability.isNullOrEmpty() && hourlyDto?.precipitation_probability?.get(0) != null) hourlyDto.precipitation_probability[0]!! else 0,
             precipitationQty = currentDto.precipitation ?: 0f,
@@ -285,7 +285,6 @@ class WeatherRepository(
             conditionIcon = conditionIcon
         )
  
-        // Hourly (next 24 hours)
         val hourlyList = mutableListOf<ForecastHour>()
         if (hourlyDto != null) {
             val times = hourlyDto.time
@@ -307,7 +306,6 @@ class WeatherRepository(
             }
         }
  
-        // Daily (next 7 days)
         val dailyList = mutableListOf<ForecastDay>()
         if (dailyDto != null) {
             val times = dailyDto.time
@@ -341,7 +339,7 @@ class WeatherRepository(
             current = currentCond,
             hourly = hourlyList,
             daily = dailyList,
-            alerts = emptyList() // Open-Meteo doesn't provide alerts in free plan
+            alerts = emptyList()
         )
     }
 
@@ -367,17 +365,16 @@ class WeatherRepository(
             windSpeed = (wind?.speed ?: 0f) * 3.6f, // m/s to km/h
             windDirection = wind?.deg ?: 0f,
             pressure = main.pressure,
-            uvIndex = 3.0f, // Not present in standard current payload
-            aqi = 2, // Standard payload doesn't contain AQI
+            uvIndex = null,
+            aqi = null,
             precipitationProb = 0,
             precipitationQty = 0f,
             sunrise = if (sys != null) SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(sys.sunrise * 1000)) else "06:00",
             sunset = if (sys != null) SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(sys.sunset * 1000)) else "21:00",
-            conditionText = weatherItem?.description?.capitalize(Locale.getDefault()) ?: "Clair",
+            conditionText = weatherItem?.description?.replaceFirstChar { it.titlecase(Locale.getDefault()) } ?: "Clair",
             conditionIcon = iconType
         )
 
-        // Parse hourly from 5-day list
         val hourlyList = mutableListOf<ForecastHour>()
         val dailyList = mutableListOf<ForecastDay>()
 
@@ -393,12 +390,11 @@ class WeatherRepository(
             )
         }
 
-        // Daily from 5-day list (grouped by date)
         forecast.list?.chunked(8)?.take(5)?.forEach { dayItems ->
             val first = dayItems.first()
             val minTemp = dayItems.minOfOrNull { it.main?.temp ?: 15f } ?: 15f
             val maxTemp = dayItems.maxOfOrNull { it.main?.temp ?: 25f } ?: 25f
-            val dateString = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(first.dt * 1000)).capitalize(Locale.getDefault())
+            val dateString = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(first.dt * 1000)).replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
             dailyList.add(
                 ForecastDay(
@@ -407,7 +403,7 @@ class WeatherRepository(
                     maxTemp = maxTemp,
                     conditionIcon = mapOwmIconToType(first.weather?.firstOrNull()?.icon ?: ""),
                     precipitationProb = ((dayItems.maxOfOrNull { it.pop } ?: 0f) * 100).toInt(),
-                    conditionText = first.weather?.firstOrNull()?.description?.capitalize(Locale.getDefault()) ?: ""
+                    conditionText = first.weather?.firstOrNull()?.description?.replaceFirstChar { it.titlecase(Locale.getDefault()) } ?: ""
                 )
             )
         }
@@ -446,7 +442,7 @@ class WeatherRepository(
             windDirection = current.wind_degree,
             pressure = current.pressure_mb,
             uvIndex = current.uv,
-            aqi = current.air_quality?.epaIndex ?: 2,
+            aqi = current.air_quality?.epaIndex,
             precipitationProb = if (forecastDayList.isNotEmpty()) forecastDayList[0].day?.daily_chance_of_rain ?: 0 else 0,
             precipitationQty = if (forecastDayList.isNotEmpty()) forecastDayList[0].day?.totalprecip_mm ?: 0f else 0f,
             sunrise = forecastDayList.firstOrNull()?.astro?.sunrise ?: "06:00",
@@ -459,7 +455,7 @@ class WeatherRepository(
         if (forecastDayList.isNotEmpty()) {
             forecastDayList[0].hour?.take(24)?.forEach { hr ->
                 val timeClean = try {
-                    val rawTime = hr.time // "2026-07-20 08:00"
+                    val rawTime = hr.time
                     rawTime.substringAfter(" ")
                 } catch (e: Exception) {
                     "00:00"
@@ -478,7 +474,7 @@ class WeatherRepository(
         val dailyList = forecastDayList.map { dayDto ->
             val dateStr = try {
                 val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dayDto.date)
-                SimpleDateFormat("EEEE", Locale.getDefault()).format(parsed).capitalize(Locale.getDefault())
+                SimpleDateFormat("EEEE", Locale.getDefault()).format(parsed).replaceFirstChar { it.titlecase(Locale.getDefault()) }
             } catch (e: Exception) {
                 dayDto.date
             }
@@ -531,11 +527,11 @@ class WeatherRepository(
             temperature = currentVals.temperature ?: 15f,
             feelsLike = currentVals.temperatureApparent ?: 15f,
             humidity = (currentVals.humidity ?: 60f).toInt(),
-            windSpeed = (currentVals.windSpeed ?: 10f) * 3.6f, // m/s to km/h
+            windSpeed = (currentVals.windSpeed ?: 10f) * 3.6f,
             windDirection = currentVals.windDirection ?: 0f,
             pressure = currentVals.pressureSurfaceLevel ?: 1013f,
-            uvIndex = (currentVals.uvIndex ?: 3).toFloat(),
-            aqi = 2,
+            uvIndex = null,
+            aqi = null,
             precipitationProb = currentVals.precipitationProbability ?: 0,
             precipitationQty = currentVals.precipitationIntensity ?: 0f,
             sunrise = "06:00",
@@ -562,7 +558,7 @@ class WeatherRepository(
         val dailyList = timelines.daily?.take(7)?.map { day ->
             val dateStr = try {
                 val date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).parse(day.time)
-                SimpleDateFormat("EEEE", Locale.getDefault()).format(date).capitalize(Locale.getDefault())
+                SimpleDateFormat("EEEE", Locale.getDefault()).format(date).replaceFirstChar { it.titlecase(Locale.getDefault()) }
             } catch (e: Exception) {
                 day.time
             }
@@ -589,7 +585,7 @@ class WeatherRepository(
         )
     }
 
-    private fun mapMetNorwayToUnified(
+    private suspend fun mapMetNorwayToUnified(
         response: com.example.data.api.MetNorwayResponse,
         cityName: String,
         lat: Double,
@@ -597,20 +593,32 @@ class WeatherRepository(
     ): UnifiedWeather {
         val timeseries = response.properties?.timeseries ?: emptyList()
         val currentItem = timeseries.firstOrNull()
-        val details = currentItem?.data?.instant?.details
+        val details = currentItem?.data?.instant?.details ?: throw Exception("Données instantanées MET Norway absentes")
         val summary = currentItem?.data?.next_1_hours?.summary ?: currentItem?.data?.next_6_hours?.summary
         val nextHoursDetails = currentItem?.data?.next_1_hours?.details
 
-        val temp = details?.air_temperature ?: 15f
-        val humidity = details?.relative_humidity?.toInt() ?: 60
-        val pressure = details?.air_pressure_at_sea_level ?: 1013f
-        val windSpeedMs = details?.wind_speed ?: 3f
+        val temp = details.air_temperature ?: throw Exception("Température MET Norway absente")
+        val humidity = details.relative_humidity?.toInt() ?: throw Exception("Humidité MET Norway absente")
+        val pressure = details.air_pressure_at_sea_level ?: throw Exception("Pression MET Norway absente")
+        val windSpeedMs = details.wind_speed ?: throw Exception("Vitesse vent MET Norway absente")
         val windSpeedKmh = windSpeedMs * 3.6f
-        val windDir = details?.wind_from_direction ?: 180f
-        val uv = details?.ultraviolet_index_clear_sky
+        val windDir = details.wind_from_direction ?: throw Exception("Direction vent MET Norway absente")
+        val uv = details.ultraviolet_index_clear_sky
+
+        val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val sunriseSunset = try {
+            externalService.getMetNorwaySunrise(
+                "https://api.met.no/weatherapi/sunrise/3.0/sun",
+                lat, lon, todayDate
+            )
+        } catch (e: Exception) {
+            null
+        }
+        val sunrise = sunriseSunset?.properties?.sunrise?.time?.let { formatSunTime(it) } ?: "06:30"
+        val sunset = sunriseSunset?.properties?.sunset?.time?.let { formatSunTime(it) } ?: "21:15"
 
         val symbolCode = summary?.symbol_code ?: "clearsky_day"
-        val conditionText = symbolCode.replace("_", " ").capitalize(Locale.getDefault())
+        val conditionText = symbolCode.replace("_", " ").replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
         val currentCond = WeatherCondition(
             temperature = temp,
@@ -623,8 +631,8 @@ class WeatherRepository(
             aqi = null,
             precipitationProb = nextHoursDetails?.probability_of_precipitation?.toInt() ?: 0,
             precipitationQty = nextHoursDetails?.precipitation_amount ?: 0f,
-            sunrise = "06:30",
-            sunset = "21:15",
+            sunrise = sunrise,
+            sunset = sunset,
             conditionText = conditionText,
             conditionIcon = mapMetNorwaySymbolToIcon(symbolCode)
         )
@@ -646,10 +654,9 @@ class WeatherRepository(
             )
         }
 
-        // Generate 7 days daily summary from timeseries chunks
         val dailyMap = timeseries.groupBy { item ->
             try {
-                item.time.substring(0, 10) // yyyy-MM-dd
+                item.time.substring(0, 10)
             } catch (e: Exception) {
                 item.time
             }
@@ -662,7 +669,7 @@ class WeatherRepository(
             val daySymbol = noonItem?.data?.next_6_hours?.summary?.symbol_code ?: noonItem?.data?.next_1_hours?.summary?.symbol_code ?: "clearsky_day"
             val dayDateFormatted = try {
                 val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dayDate)
-                SimpleDateFormat("EEEE", Locale.getDefault()).format(date).capitalize(Locale.getDefault())
+                SimpleDateFormat("EEEE", Locale.getDefault()).format(date).replaceFirstChar { it.titlecase(Locale.getDefault()) }
             } catch (e: Exception) {
                 dayDate
             }
@@ -672,7 +679,7 @@ class WeatherRepository(
                 maxTemp = maxT,
                 conditionIcon = mapMetNorwaySymbolToIcon(daySymbol),
                 precipitationProb = noonItem?.data?.next_6_hours?.details?.probability_of_precipitation?.toInt() ?: 0,
-                conditionText = daySymbol.replace("_", " ").capitalize(Locale.getDefault())
+                conditionText = daySymbol.replace("_", " ").replaceFirstChar { it.titlecase(Locale.getDefault()) }
             )
         }
 
@@ -701,9 +708,6 @@ class WeatherRepository(
         }
     }
 
-
-    // ------------------- Average Calculator Logic -------------------
-
     private fun calculateAverageWeather(sources: List<UnifiedWeather>): WeatherCondition {
         val count = sources.size.toFloat()
         val avgTemp = sources.sumOf { it.current.temperature.toDouble() }.toFloat() / count
@@ -719,8 +723,9 @@ class WeatherRepository(
         val avgPrecipProb = (sources.sumOf { it.current.precipitationProb } / sources.size)
         val avgPrecipQty = sources.sumOf { it.current.precipitationQty.toDouble() }.toFloat() / count
 
-        // Choose majority condition text and icon
-        val majoritySource = sources.first() // simple consensus: take first (Open-Meteo as primary reference)
+        val firstSource = sources.first()
+        val representativeSunrise = sources.mapNotNull { it.current.sunrise }.firstOrNull() ?: "06:30"
+        val representativeSunset = sources.mapNotNull { it.current.sunset }.firstOrNull() ?: "21:15"
 
         return WeatherCondition(
             temperature = avgTemp,
@@ -733,64 +738,44 @@ class WeatherRepository(
             aqi = avgAqi,
             precipitationProb = avgPrecipProb,
             precipitationQty = avgPrecipQty,
-            sunrise = majoritySource.current.sunrise,
-            sunset = majoritySource.current.sunset,
-            conditionText = majoritySource.current.conditionText,
-            conditionIcon = majoritySource.current.conditionIcon
+            sunrise = representativeSunrise,
+            sunset = representativeSunset,
+            conditionText = firstSource.current.conditionText,
+            conditionIcon = firstSource.current.conditionIcon
         )
     }
 
     private fun calculateAverageHourly(sources: List<UnifiedWeather>): List<ForecastHour> {
-        if (sources.isEmpty()) return emptyList()
-        val firstSourceHours = sources.first().hourly
-        val avgHours = mutableListOf<ForecastHour>()
-
-        for (i in firstSourceHours.indices) {
-            val matchingHourItems = sources.mapNotNull { it.hourly.getOrNull(i) }
-            if (matchingHourItems.isEmpty()) continue
-
-            val count = matchingHourItems.size.toFloat()
-            val avgTemp = matchingHourItems.sumOf { it.temp.toDouble() }.toFloat() / count
-            val avgPrecip = matchingHourItems.sumOf { it.precipitationProb } / matchingHourItems.size
-
-            avgHours.add(
-                ForecastHour(
-                    time = firstSourceHours[i].time,
-                    temp = avgTemp,
-                    conditionIcon = firstSourceHours[i].conditionIcon,
-                    precipitationProb = avgPrecip
-                )
+        val firstSource = sources.first()
+        return firstSource.hourly.indices.map { index ->
+            val matchingHours = sources.mapNotNull { it.hourly.getOrNull(index) }
+            val avgTemp = matchingHours.map { it.temp }.average().toFloat()
+            val avgProb = matchingHours.map { it.precipitationProb }.average().toInt()
+            ForecastHour(
+                time = firstSource.hourly[index].time,
+                temp = avgTemp,
+                conditionIcon = firstSource.hourly[index].conditionIcon,
+                precipitationProb = avgProb
             )
         }
-        return avgHours
     }
 
     private fun calculateAverageDaily(sources: List<UnifiedWeather>): List<ForecastDay> {
-        if (sources.isEmpty()) return emptyList()
-        val firstSourceDays = sources.first().daily
-        val avgDays = mutableListOf<ForecastDay>()
-
-        for (i in firstSourceDays.indices) {
-            val matchingDayItems = sources.mapNotNull { it.daily.getOrNull(i) }
-            if (matchingDayItems.isEmpty()) continue
-
-            val count = matchingDayItems.size.toFloat()
-            val avgMin = matchingDayItems.sumOf { it.minTemp.toDouble() }.toFloat() / count
-            val avgMax = matchingDayItems.sumOf { it.maxTemp.toDouble() }.toFloat() / count
-            val avgPrecip = matchingDayItems.sumOf { it.precipitationProb } / matchingDayItems.size
-
-            avgDays.add(
-                ForecastDay(
-                    date = firstSourceDays[i].date,
-                    minTemp = avgMin,
-                    maxTemp = avgMax,
-                    conditionIcon = firstSourceDays[i].conditionIcon,
-                    precipitationProb = avgPrecip,
-                    conditionText = firstSourceDays[i].conditionText
-                )
+        val firstSource = sources.first()
+        return firstSource.daily.indices.map { index ->
+            val matchingDays = sources.mapNotNull { it.daily.getOrNull(index) }
+            val avgMin = matchingDays.map { it.minTemp }.average().toFloat()
+            val avgMax = matchingDays.map { it.maxTemp }.average().toFloat()
+            val avgProb = matchingDays.map { it.precipitationProb }.average().toInt()
+            ForecastDay(
+                date = firstSource.daily[index].date,
+                minTemp = avgMin,
+                maxTemp = avgMax,
+                conditionIcon = firstSource.daily[index].conditionIcon,
+                precipitationProb = avgProb,
+                conditionText = firstSource.daily[index].conditionText
             )
         }
-        return avgDays
     }
 
     private fun calculateDeviations(
@@ -804,17 +789,14 @@ class WeatherRepository(
 
             WeatherDeviation(
                 temperatureDeviation = tempDev,
-                isTemperatureUnreliable = abs(tempDev) > 1.5f, // diverges by more than 1.5°C
+                isTemperatureUnreliable = abs(tempDev) > 1.5f,
                 pressureDeviation = presDev,
-                isPressureUnreliable = abs(presDev) > 4.0f, // diverges by more than 4 hPa
+                isPressureUnreliable = abs(presDev) > 4.0f,
                 windDeviation = windDev,
-                isWindUnreliable = abs(windDev) > 6.0f // diverges by more than 6 km/h
+                isWindUnreliable = abs(windDev) > 6.0f
             )
         }
     }
-
-
-    // ------------------- Helpers & Mapping logic -------------------
 
     private fun mapWmoCodeToText(code: Int): String {
         return when (code) {
@@ -834,7 +816,7 @@ class WeatherRepository(
         return when (code) {
             0 -> "sunny"
             1, 2, 3 -> "cloudy"
-            45, 48 -> "cloudy" // Fog
+            45, 48 -> "cloudy"
             51, 53, 55 -> "rainy"
             61, 63, 65 -> "rainy"
             71, 73, 75 -> "snowy"
@@ -846,7 +828,7 @@ class WeatherRepository(
 
     private fun formatSunTime(raw: String): String {
         return try {
-            raw.substringAfter("T").substring(0, 5) // "2026-07-20T06:12" -> "06:12"
+            raw.substringAfter("T").substring(0, 5)
         } catch (e: Exception) {
             "06:00"
         }
@@ -854,7 +836,7 @@ class WeatherRepository(
 
     private fun formatHourlyTime(raw: String): String {
         return try {
-            raw.substringAfter("T").substring(0, 5) // "2026-07-20T08:00" -> "08:00"
+            raw.substringAfter("T").substring(0, 5)
         } catch (e: Exception) {
             "00:00"
         }
@@ -863,7 +845,7 @@ class WeatherRepository(
     private fun formatDailyDate(raw: String): String {
         return try {
             val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(raw)
-            SimpleDateFormat("EEEE", Locale.getDefault()).format(parsed).capitalize(Locale.getDefault())
+            SimpleDateFormat("EEEE", Locale.getDefault()).format(parsed).replaceFirstChar { it.titlecase(Locale.getDefault()) }
         } catch (e: Exception) {
             raw
         }
@@ -884,7 +866,7 @@ class WeatherRepository(
         return when (code) {
             1000 -> "sunny"
             1003, 1006, 1009 -> "cloudy"
-            1030, 1135, 1147 -> "cloudy" // Fog
+            1030, 1135, 1147 -> "cloudy"
             1063, 1150, 1153, 1180, 1183, 1186, 1189, 1192, 1195, 1240, 1243 -> "rainy"
             1087, 1273, 1276 -> "thunderstorm"
             1114, 1117, 1210, 1213, 1216, 1219, 1222, 1225, 1255, 1258 -> "snowy"
@@ -896,7 +878,7 @@ class WeatherRepository(
         return when (code) {
             1000, 1100 -> "sunny"
             1101, 1102, 1001 -> "cloudy"
-            2000, 2100 -> "cloudy" // Fog
+            2000, 2100 -> "cloudy"
             4000, 4001, 4200, 4201 -> "rainy"
             8000 -> "thunderstorm"
             5000, 5001, 5100, 5101 -> "snowy"

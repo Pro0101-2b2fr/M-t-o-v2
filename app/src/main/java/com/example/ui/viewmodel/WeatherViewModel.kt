@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import com.squareup.moshi.Moshi
@@ -341,12 +342,12 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     val random = java.util.Random()
                     val lat = random.nextDouble() * 30 + 35 // realistic lat
                     val lon = random.nextDouble() * 40 - 10 // realistic lon
-                    addCityToFavorites(cleanQuery.capitalize(), lat, lon)
+                    addCityToFavorites(cleanQuery.replaceFirstChar { it.titlecase(Locale.getDefault()) }, lat, lon)
                     withContext(Dispatchers.Main) { onSuccess() }
                 }
             } catch (e: Exception) {
                 // If geocoder throws, fall back to adding city with random coordinates
-                val cleanQuery = query.trim().capitalize()
+                val cleanQuery = query.trim().replaceFirstChar { it.titlecase(Locale.getDefault()) }
                 val random = java.util.Random()
                 val lat = random.nextDouble() * 10 + 40
                 val lon = random.nextDouble() * 5 + 2
