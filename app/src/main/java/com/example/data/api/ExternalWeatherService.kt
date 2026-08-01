@@ -1,10 +1,20 @@
 package com.example.data.api
 
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.Query
 import retrofit2.http.Url
 
 interface ExternalWeatherService {
+
+    // MET Norway (Yr) Compact Forecast
+    @GET
+    @Headers("User-Agent: MeteoCompare/1.0 github.com/Pro0101-2b2fr")
+    suspend fun getMetNorwayForecast(
+        @Url url: String,
+        @Query("lat") lat: Double,
+        @Query("lon") lon: Double
+    ): MetNorwayResponse
 
     // OpenWeatherMap Current Conditions
     @GET
@@ -201,3 +211,52 @@ data class TomorrowValues(
     val sunsetTime: String?,
     val weatherCode: Int?
 )
+
+// ------------------- MET Norway DTOs -------------------
+data class MetNorwayResponse(
+    val properties: MetNorwayProperties?
+)
+
+data class MetNorwayProperties(
+    val timeseries: List<MetNorwayTimeseriesItem>?
+)
+
+data class MetNorwayTimeseriesItem(
+    val time: String,
+    val data: MetNorwayData?
+)
+
+data class MetNorwayData(
+    val instant: MetNorwayInstant?,
+    val next_1_hours: MetNorwayNextHours?,
+    val next_6_hours: MetNorwayNextHours?,
+    val next_12_hours: MetNorwayNextHours?
+)
+
+data class MetNorwayInstant(
+    val details: MetNorwayInstantDetails?
+)
+
+data class MetNorwayInstantDetails(
+    val air_pressure_at_sea_level: Float? = null,
+    val air_temperature: Float? = null,
+    val relative_humidity: Float? = null,
+    val wind_from_direction: Float? = null,
+    val wind_speed: Float? = null,
+    val ultraviolet_index_clear_sky: Float? = null
+)
+
+data class MetNorwayNextHours(
+    val summary: MetNorwaySummary?,
+    val details: MetNorwayNextDetails?
+)
+
+data class MetNorwaySummary(
+    val symbol_code: String? = null
+)
+
+data class MetNorwayNextDetails(
+    val precipitation_amount: Float? = null,
+    val probability_of_precipitation: Float? = null
+)
+

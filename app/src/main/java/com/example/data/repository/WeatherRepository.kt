@@ -197,95 +197,53 @@ class WeatherRepository(
             val response = openMeteoService.getGfsForecast(lat, lon)
             return mapOpenMeteoToUnified(response, pmAqi, cityName).copy(source = WeatherSource.NCEP_GFS)
         }
+        if (source == WeatherSource.ECMWF) {
+            val response = openMeteoService.getEcmwfForecast(lat, lon)
+            return mapOpenMeteoToUnified(response, pmAqi, cityName).copy(source = WeatherSource.ECMWF)
+        }
+        if (source == WeatherSource.MET_NORWAY) {
+            val response = externalService.getMetNorwayForecast(
+                "https://api.met.no/weatherapi/locationforecast/2.0/compact",
+                lat, lon
+            )
+            return mapMetNorwayToUnified(response, cityName, lat, lon)
+        }
 
         val apiKey = settings.apiKeys[source] ?: ""
         
-        // If API key is available, run real network call
-        if (apiKey.isNotBlank()) {
-            return try {
-                when (source) {
-                    WeatherSource.OPEN_WEATHER_MAP -> {
-                        // Current
-                        val currentOw = externalService.getOpenWeatherCurrent(
-                            "https://api.openweathermap.org/data/2.5/weather",
-                            lat, lon, apiKey
-                        )
-                        // Forecast
-                        val forecastOw = externalService.getOpenWeatherForecast(
-                            "https://api.openweathermap.org/data/2.5/forecast",
-                            lat, lon, apiKey
-                        )
-                        mapOpenWeatherToUnified(currentOw, forecastOw, cityName, lat, lon)
-                    }
-                    WeatherSource.WEATHER_API -> {
-                        val response = externalService.getWeatherApiForecast(
-                            "https://api.weatherapi.com/v1/forecast.json",
-                            apiKey, "$lat,$lon"
-                        )
-                        mapWeatherApiToUnified(response, cityName, lat, lon)
-                    }
-                    WeatherSource.TOMORROW_IO -> {
-                        val response = externalService.getTomorrowForecast(
-                            "https://api.tomorrow.io/v4/weather/forecast",
-                            "$lat,$lon", apiKey
-                        )
-                        mapTomorrowToUnified(response, cityName, lat, lon)
-                    }
-                    else -> baseWeather
-                }
-            } catch (e: Exception) {
-                Log.e("WeatherRepo", "Real call to ${source.name} failed, falling back to simulated comparison values: ${e.message}")
-                generateSimulatedOffset(baseWeather, source)
+        // If API key is missing, throw clear exception (no simulated replacement data)
+        if (apiKey.isBlank()) {
+            throw Exception("Clé API manquante dans les réglages")
+        }
+
+        return when (source) {
+            WeatherSource.OPEN_WEATHER_MAP -> {
+                val currentOw = externalService.getOpenWeatherCurrent(
+                    "https://api.openweathermap.org/data/2.5/weather",
+                    lat, lon, apiKey
+                )
+                val forecastOw = externalService.getOpenWeatherForecast(
+                    "https://api.openweathermap.org/data/2.5/forecast",
+                    lat, lon, apiKey
+                )
+                mapOpenWeatherToUnified(currentOw, forecastOw, cityName, lat, lon)
             }
-        } else {
-            // Generate realistic offset weather data derived from real Open-Meteo to show côte-à-côte visual deviations
-            return generateSimulatedOffset(baseWeather, source)
+            WeatherSource.WEATHER_API -> {
+                val response = externalService.getWeatherApiForecast(
+                    "https://api.weatherapi.com/v1/forecast.json",
+                    apiKey, "$lat,$lon"
+                )
+                mapWeatherApiToUnified(response, cityName, lat, lon)
+            }
+            WeatherSource.TOMORROW_IO -> {
+                val response = externalService.getTomorrowForecast(
+                    "https://api.tomorrow.io/v4/weather/forecast",
+                    "$lat,$lon", apiKey
+                )
+                mapTomorrowToUnified(response, cityName, lat, lon)
+            }
+            else -> throw Exception("Source non prise en charge: ${source.displayName}")
         }
-    }
-
-    // Helper: generate realistic mock data offsets based on real baseline to showcase comparative layout
-    private fun generateSimulatedOffset(baseline: UnifiedWeather, source: WeatherSource): UnifiedWeather {
-        // Introduce small random seeds depending on source
-        val seed = source.ordinal * 10
-        val random = Random(baseline.timestamp + seed)
-
-        val tempOffset = (random.nextDouble(-1.2, 1.4)).toFloat()
-        val feelsOffset = (random.nextDouble(-1.5, 1.5)).toFloat()
-        val humidityOffset = random.nextInt(-8, 9)
-        val pressureOffset = (random.nextDouble(-4.0, 5.0)).toFloat()
-        val windOffset = (random.nextDouble(-5.0, 6.0)).toFloat()
-        val aqiOffset = random.nextInt(-1, 2)
-
-        val currentCond = baseline.current.copy(
-            temperature = baseline.current.temperature + tempOffset,
-            feelsLike = baseline.current.feelsLike + feelsOffset,
-            humidity = (baseline.current.humidity + humidityOffset).coerceIn(10, 100),
-            pressure = baseline.current.pressure + pressureOffset,
-            windSpeed = (baseline.current.windSpeed + windOffset).coerceAtLeast(0f),
-            aqi = (baseline.current.aqi + aqiOffset).coerceIn(1, 5)
-        )
-
-        val hourlyOffset = baseline.hourly.map { hour ->
-            hour.copy(
-                temp = hour.temp + (random.nextDouble(-1.0, 1.0)).toFloat(),
-                precipitationProb = (hour.precipitationProb + random.nextInt(-10, 15)).coerceIn(0, 100)
-            )
-        }
-
-        val dailyOffset = baseline.daily.map { day ->
-            day.copy(
-                minTemp = day.minTemp + (random.nextDouble(-0.8, 0.8)).toFloat(),
-                maxTemp = day.maxTemp + (random.nextDouble(-1.2, 1.2)).toFloat(),
-                precipitationProb = (day.precipitationProb + random.nextInt(-15, 15)).coerceIn(0, 100)
-            )
-        }
-
-        return baseline.copy(
-            source = source,
-            current = currentCond,
-            hourly = hourlyOffset,
-            daily = dailyOffset
-        )
     }
 
     // Map Open-Meteo to UnifiedWeather
@@ -631,6 +589,118 @@ class WeatherRepository(
         )
     }
 
+    private fun mapMetNorwayToUnified(
+        response: com.example.data.api.MetNorwayResponse,
+        cityName: String,
+        lat: Double,
+        lon: Double
+    ): UnifiedWeather {
+        val timeseries = response.properties?.timeseries ?: emptyList()
+        val currentItem = timeseries.firstOrNull()
+        val details = currentItem?.data?.instant?.details
+        val summary = currentItem?.data?.next_1_hours?.summary ?: currentItem?.data?.next_6_hours?.summary
+        val nextHoursDetails = currentItem?.data?.next_1_hours?.details
+
+        val temp = details?.air_temperature ?: 15f
+        val humidity = details?.relative_humidity?.toInt() ?: 60
+        val pressure = details?.air_pressure_at_sea_level ?: 1013f
+        val windSpeedMs = details?.wind_speed ?: 3f
+        val windSpeedKmh = windSpeedMs * 3.6f
+        val windDir = details?.wind_from_direction ?: 180f
+        val uv = details?.ultraviolet_index_clear_sky
+
+        val symbolCode = summary?.symbol_code ?: "clearsky_day"
+        val conditionText = symbolCode.replace("_", " ").capitalize(Locale.getDefault())
+
+        val currentCond = WeatherCondition(
+            temperature = temp,
+            feelsLike = temp,
+            humidity = humidity,
+            windSpeed = windSpeedKmh,
+            windDirection = windDir,
+            pressure = pressure,
+            uvIndex = uv,
+            aqi = null,
+            precipitationProb = nextHoursDetails?.probability_of_precipitation?.toInt() ?: 0,
+            precipitationQty = nextHoursDetails?.precipitation_amount ?: 0f,
+            sunrise = "06:30",
+            sunset = "21:15",
+            conditionText = conditionText,
+            conditionIcon = mapMetNorwaySymbolToIcon(symbolCode)
+        )
+
+        val hourlyList = timeseries.take(24).map { item ->
+            val timeStr = try {
+                val date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).parse(item.time)
+                SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
+            } catch (e: Exception) {
+                "00:00"
+            }
+            val hDetails = item.data?.instant?.details
+            val hSummary = item.data?.next_1_hours?.summary
+            ForecastHour(
+                time = timeStr,
+                temp = hDetails?.air_temperature ?: temp,
+                conditionIcon = mapMetNorwaySymbolToIcon(hSummary?.symbol_code ?: "clearsky_day"),
+                precipitationProb = item.data?.next_1_hours?.details?.probability_of_precipitation?.toInt() ?: 0
+            )
+        }
+
+        // Generate 7 days daily summary from timeseries chunks
+        val dailyMap = timeseries.groupBy { item ->
+            try {
+                item.time.substring(0, 10) // yyyy-MM-dd
+            } catch (e: Exception) {
+                item.time
+            }
+        }
+
+        val dailyList = dailyMap.entries.take(7).map { (dayDate, items) ->
+            val minT = items.mapNotNull { it.data?.instant?.details?.air_temperature }.minOrNull() ?: temp
+            val maxT = items.mapNotNull { it.data?.instant?.details?.air_temperature }.maxOrNull() ?: temp
+            val noonItem = items.getOrNull(items.size / 2) ?: items.firstOrNull()
+            val daySymbol = noonItem?.data?.next_6_hours?.summary?.symbol_code ?: noonItem?.data?.next_1_hours?.summary?.symbol_code ?: "clearsky_day"
+            val dayDateFormatted = try {
+                val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dayDate)
+                SimpleDateFormat("EEEE", Locale.getDefault()).format(date).capitalize(Locale.getDefault())
+            } catch (e: Exception) {
+                dayDate
+            }
+            ForecastDay(
+                date = dayDateFormatted,
+                minTemp = minT,
+                maxTemp = maxT,
+                conditionIcon = mapMetNorwaySymbolToIcon(daySymbol),
+                precipitationProb = noonItem?.data?.next_6_hours?.details?.probability_of_precipitation?.toInt() ?: 0,
+                conditionText = daySymbol.replace("_", " ").capitalize(Locale.getDefault())
+            )
+        }
+
+        return UnifiedWeather(
+            source = WeatherSource.MET_NORWAY,
+            timestamp = System.currentTimeMillis(),
+            cityName = cityName,
+            latitude = lat,
+            longitude = lon,
+            current = currentCond,
+            hourly = hourlyList,
+            daily = dailyList,
+            alerts = emptyList()
+        )
+    }
+
+    private fun mapMetNorwaySymbolToIcon(symbolCode: String): String {
+        return when {
+            symbolCode.contains("rain") || symbolCode.contains("drizzle") -> "🌧️"
+            symbolCode.contains("thunder") -> "⛈️"
+            symbolCode.contains("snow") || symbolCode.contains("sleet") -> "❄️"
+            symbolCode.contains("fog") -> "🌫️"
+            symbolCode.contains("cloud") && symbolCode.contains("partly") -> "⛅"
+            symbolCode.contains("cloud") -> "☁️"
+            else -> "☀️"
+        }
+    }
+
 
     // ------------------- Average Calculator Logic -------------------
 
@@ -642,8 +712,10 @@ class WeatherRepository(
         val avgWind = sources.sumOf { it.current.windSpeed.toDouble() }.toFloat() / count
         val avgWindDir = sources.sumOf { it.current.windDirection.toDouble() }.toFloat() / count
         val avgPres = sources.sumOf { it.current.pressure.toDouble() }.toFloat() / count
-        val avgUv = sources.sumOf { it.current.uvIndex.toDouble() }.toFloat() / count
-        val avgAqi = (sources.sumOf { it.current.aqi } / sources.size)
+        val uvList = sources.mapNotNull { it.current.uvIndex }
+        val avgUv = if (uvList.isNotEmpty()) uvList.sumOf { it.toDouble() }.toFloat() / uvList.size else null
+        val aqiList = sources.mapNotNull { it.current.aqi }
+        val avgAqi = if (aqiList.isNotEmpty()) aqiList.sum() / aqiList.size else null
         val avgPrecipProb = (sources.sumOf { it.current.precipitationProb } / sources.size)
         val avgPrecipQty = sources.sumOf { it.current.precipitationQty.toDouble() }.toFloat() / count
 

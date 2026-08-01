@@ -8,6 +8,8 @@ enum class WeatherSource(val displayName: String, val requiresKey: Boolean, val 
     METEO_FRANCE("Météo-France", false, 10000),
     DWD_ICON("DWD (Allemagne)", false, 10000),
     NCEP_GFS("NCEP GFS (USA)", false, 10000),
+    MET_NORWAY("MET Norway (Yr)", false, 10000),
+    ECMWF("ECMWF (Open-Meteo)", false, 10000),
     OPEN_WEATHER_MAP("OpenWeatherMap", true, 1000),
     WEATHER_API("WeatherAPI", true, 1000),
     TOMORROW_IO("Tomorrow.io", true, 500)
@@ -20,8 +22,8 @@ data class WeatherCondition(
     val windSpeed: Float, // km/h
     val windDirection: Float, // degrees
     val pressure: Float, // hPa
-    val uvIndex: Float,
-    val aqi: Int, // Air Quality Index (1-5 or US AQI)
+    val uvIndex: Float? = null,
+    val aqi: Int? = null, // Air Quality Index (1-5 or US AQI)
     val precipitationProb: Int, // %
     val precipitationQty: Float, // mm
     val sunrise: String, // HH:MM

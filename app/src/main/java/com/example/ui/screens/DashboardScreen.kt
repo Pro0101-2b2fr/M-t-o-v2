@@ -779,7 +779,7 @@ fun DailyForecastCard(result: ComparativeWeatherResult, settings: AppSettings) {
 
 @Composable
 fun ExtraAqiCard(result: ComparativeWeatherResult, onHide: () -> Unit) {
-    val aqiVal = result.averageWeather.aqi
+    val aqiVal = result.averageWeather.aqi ?: 1
     val (aqiLabel, aqiDesc, aqiColor) = when (aqiVal) {
         1 -> Triple("Excellent", "Qualité de l'air idéale pour les activités extérieures.", ReliabilityHighColor)
         2 -> Triple("Bon", "Qualité satisfaisante, peu ou pas de risques.", ReliabilityHighColor)
@@ -858,7 +858,7 @@ fun ExtraAqiCard(result: ComparativeWeatherResult, onHide: () -> Unit) {
 
 @Composable
 fun ExtraUvCard(result: ComparativeWeatherResult, onHide: () -> Unit) {
-    val uv = result.averageWeather.uvIndex
+    val uv = result.averageWeather.uvIndex ?: 0f
     val (uvLabel, uvDesc, uvColor) = when {
         uv <= 2f -> Triple("Faible", "Pas de protection nécessaire.", ReliabilityHighColor)
         uv <= 5f -> Triple("Modéré", "Crème solaire recommandée.", ReliabilityMediumColor)

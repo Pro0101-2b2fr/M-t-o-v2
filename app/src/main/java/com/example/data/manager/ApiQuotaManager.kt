@@ -21,6 +21,19 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "me
 
 class ApiQuotaManager(private val context: Context) {
 
+    private val encryptedPrefs by lazy {
+        val masterKey = androidx.security.crypto.MasterKey.Builder(context)
+            .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        androidx.security.crypto.EncryptedSharedPreferences.create(
+            context,
+            "secure_weather_api_keys",
+            masterKey,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+
     companion object {
         // Quota Keys
         private val KEY_QUOTA_DATE = stringPreferencesKey("quota_date")
@@ -35,7 +48,7 @@ class ApiQuotaManager(private val context: Context) {
         val KEY_PRIORITY_SOURCE = stringPreferencesKey("priority_source") // "OPEN_METEO" etc.
         val KEY_VISIBLE_WIDGETS = stringSetPreferencesKey("visible_widgets") // "aqi", "uv", "wind", "alerts", "details"
         
-        // API Keys Preferences
+        // API Keys Preferences (legacy trigger preference)
         fun getApiKeyPreference(source: WeatherSource) = stringPreferencesKey("api_key_${source.name}")
         
         // Enabled Status Preferences (user explicitly toggles)
@@ -74,7 +87,22 @@ class ApiQuotaManager(private val context: Context) {
         }
 
         val apiKeys = WeatherSource.values().associateWith { source ->
-            prefs[getApiKeyPreference(source)] ?: ""
+            val secureKey = try {
+                encryptedPrefs.getString("api_key_${source.name}", "") ?: ""
+            } catch (e: Exception) {
+                ""
+            }
+            val oldPlainKey = prefs[getApiKeyPreference(source)] ?: ""
+            if (secureKey.isEmpty() && oldPlainKey.isNotEmpty() && oldPlainKey != "[ENCRYPTED]") {
+                try {
+                    encryptedPrefs.edit().putString("api_key_${source.name}", oldPlainKey).apply()
+                } catch (e: Exception) {
+                    // Ignore crypto exception
+                }
+                oldPlainKey
+            } else {
+                secureKey
+            }
         }
 
         AppSettings(
@@ -132,8 +160,13 @@ class ApiQuotaManager(private val context: Context) {
 
     // Set configuration helper methods
     suspend fun saveApiKey(source: WeatherSource, key: String) {
+        try {
+            encryptedPrefs.edit().putString("api_key_${source.name}", key).apply()
+        } catch (e: Exception) {
+            // Fallback safety
+        }
         context.dataStore.edit { prefs ->
-            prefs[getApiKeyPreference(source)] = key
+            prefs[getApiKeyPreference(source)] = if (key.isNotEmpty()) "[ENCRYPTED]" else ""
         }
     }
 
