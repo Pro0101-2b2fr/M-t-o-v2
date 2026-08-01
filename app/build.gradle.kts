@@ -111,4 +111,6 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
   implementation("androidx.work:work-runtime-ktx:2.9.1")
+  implementation("androidx.glance:glance-appwidget:1.1.0")
+  implementation("androidx.glance:glance-material3:1.1.0")
 }

@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.MeteoApplication
 import com.example.data.api.ExternalWeatherService
 import com.example.data.api.OpenMeteoService
 import com.example.data.db.WeatherDatabase
@@ -35,29 +36,29 @@ class WeatherSyncWorker(
         Log.d("WeatherSyncWorker", "Background sync started...")
         
         try {
-            // Build dependency instances manually since we are using simple constructor injection
-            val okHttpClient = OkHttpClient.Builder().build()
-            
-            val openMeteoService = Retrofit.Builder()
+            val app = appContext as? com.example.MeteoApplication
+            val container = app?.container
+
+            val okHttpClient = container?.okHttpClient ?: OkHttpClient.Builder().build()
+            val openMeteoService = container?.openMeteoService ?: Retrofit.Builder()
                 .baseUrl("https://api.open-meteo.com/v1/")
                 .client(okHttpClient)
                 .addConverterFactory(MoshiConverterFactory.create())
                 .build()
                 .create(OpenMeteoService::class.java)
 
-            val externalService = Retrofit.Builder()
+            val externalService = container?.externalService ?: Retrofit.Builder()
                 .baseUrl("https://api.openweathermap.org/data/2.5/")
                 .client(okHttpClient)
                 .addConverterFactory(MoshiConverterFactory.create())
                 .build()
                 .create(ExternalWeatherService::class.java)
 
-            val database = WeatherDatabase.getDatabase(appContext)
-            val weatherDao = database.weatherDao()
-            val quotaManager = ApiQuotaManager(appContext)
-            val locationManager = LocationManager(appContext)
+            val weatherDao = container?.weatherDao ?: WeatherDatabase.getDatabase(appContext).weatherDao()
+            val quotaManager = container?.quotaManager ?: ApiQuotaManager(appContext)
+            val locationManager = container?.locationManager ?: LocationManager(appContext)
 
-            val repository = WeatherRepository(
+            val repository = container?.weatherRepository ?: WeatherRepository(
                 openMeteoService = openMeteoService,
                 externalService = externalService,
                 weatherDao = weatherDao,
@@ -112,6 +113,17 @@ class WeatherSyncWorker(
                         "La source ${source.displayName} est proche de sa limite d'appels gratuits (${calls}/${limit})."
                     )
                 }
+            }
+
+            // 5. Update Glance Widget
+            try {
+                val manager = androidx.glance.appwidget.GlanceAppWidgetManager(appContext)
+                val glanceIds = manager.getGlanceIds(com.example.data.widget.WeatherWidget::class.java)
+                glanceIds.forEach { glanceId ->
+                    com.example.data.widget.WeatherWidget().update(appContext, glanceId)
+                }
+            } catch (e: Exception) {
+                Log.e("WeatherSyncWorker", "Error updating widget: ${e.message}")
             }
 
             Log.d("WeatherSyncWorker", "Background sync completed successfully.")

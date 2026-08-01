@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.MeteoApplication
 import com.example.data.api.ExternalWeatherService
 import com.example.data.api.OpenMeteoService
 import com.example.data.db.WeatherDatabase
@@ -39,39 +40,30 @@ import java.util.concurrent.TimeUnit
 class WeatherViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
-    
-    // Core Services Setup (constructor injection alternative for Single Activity ViewModel)
-    private val database = WeatherDatabase.getDatabase(context)
-    private val weatherDao = database.weatherDao()
-    private val quotaManager = ApiQuotaManager(context)
-    private val locationManager = LocationManager(context)
+    private val meteoApp = application as? MeteoApplication
+    private val container = meteoApp?.container
 
-    private val okHttpClient = OkHttpClient.Builder().build()
-    
-    private val moshi = Moshi.Builder()
-        .addLast(KotlinJsonAdapterFactory())
-        .build()
-    
-    private val openMeteoService = Retrofit.Builder()
-        .baseUrl("https://api.open-meteo.com/v1/")
-        .client(okHttpClient)
-        .addConverterFactory(MoshiConverterFactory.create(moshi))
-        .build()
-        .create(OpenMeteoService::class.java)
+    private val weatherDao = container?.weatherDao ?: WeatherDatabase.getDatabase(context).weatherDao()
+    private val quotaManager = container?.quotaManager ?: ApiQuotaManager(context)
+    private val locationManager = container?.locationManager ?: LocationManager(context)
 
-    private val externalService = Retrofit.Builder()
-        .baseUrl("https://api.openweathermap.org/data/2.5/")
-        .client(okHttpClient)
-        .addConverterFactory(MoshiConverterFactory.create(moshi))
-        .build()
-        .create(ExternalWeatherService::class.java)
-
-    private val repository = WeatherRepository(
-        openMeteoService = openMeteoService,
-        externalService = externalService,
-        weatherDao = weatherDao,
-        quotaManager = quotaManager
-    )
+    private val repository = container?.weatherRepository ?: run {
+        val okHttpClient = OkHttpClient.Builder().build()
+        val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+        val openMeteoService = Retrofit.Builder()
+            .baseUrl("https://api.open-meteo.com/v1/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(OpenMeteoService::class.java)
+        val externalService = Retrofit.Builder()
+            .baseUrl("https://api.openweathermap.org/data/2.5/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(ExternalWeatherService::class.java)
+        WeatherRepository(openMeteoService, externalService, weatherDao, quotaManager)
+    }
 
     // Flow representing all configuration and usage quotas
     val appSettings: StateFlow<AppSettings> = quotaManager.appSettingsFlow.stateIn(

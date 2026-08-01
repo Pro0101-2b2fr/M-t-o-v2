@@ -614,8 +614,8 @@ class WeatherRepository(
         } catch (e: Exception) {
             null
         }
-        val sunrise = sunriseSunset?.properties?.sunrise?.time?.let { formatSunTime(it) } ?: "06:30"
-        val sunset = sunriseSunset?.properties?.sunset?.time?.let { formatSunTime(it) } ?: "21:15"
+        val sunrise = sunriseSunset?.properties?.sunrise?.time?.let { formatSunTime(it) } ?: throw Exception("Lever du soleil MET Norway absent")
+        val sunset = sunriseSunset?.properties?.sunset?.time?.let { formatSunTime(it) } ?: throw Exception("Coucher du soleil MET Norway absent")
 
         val symbolCode = summary?.symbol_code ?: "clearsky_day"
         val conditionText = symbolCode.replace("_", " ").replaceFirstChar { it.titlecase(Locale.getDefault()) }
@@ -708,7 +708,7 @@ class WeatherRepository(
         }
     }
 
-    private fun calculateAverageWeather(sources: List<UnifiedWeather>): WeatherCondition {
+    internal fun calculateAverageWeather(sources: List<UnifiedWeather>): WeatherCondition {
         val count = sources.size.toFloat()
         val avgTemp = sources.sumOf { it.current.temperature.toDouble() }.toFloat() / count
         val avgFeels = sources.sumOf { it.current.feelsLike.toDouble() }.toFloat() / count
@@ -778,7 +778,7 @@ class WeatherRepository(
         }
     }
 
-    private fun calculateDeviations(
+    internal fun calculateDeviations(
         sources: Map<WeatherSource, UnifiedWeather>,
         avg: WeatherCondition
     ): Map<WeatherSource, WeatherDeviation> {
@@ -798,7 +798,7 @@ class WeatherRepository(
         }
     }
 
-    private fun mapWmoCodeToText(code: Int): String {
+    internal fun mapWmoCodeToText(code: Int): String {
         return when (code) {
             0 -> "Ensoleillé"
             1, 2, 3 -> "Partiellement Nuageux"
@@ -812,7 +812,7 @@ class WeatherRepository(
         }
     }
 
-    private fun mapWmoCodeToIcon(code: Int): String {
+    internal fun mapWmoCodeToIcon(code: Int): String {
         return when (code) {
             0 -> "sunny"
             1, 2, 3 -> "cloudy"

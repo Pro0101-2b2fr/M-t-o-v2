@@ -35,6 +35,9 @@ interface WeatherDao {
     @Query("SELECT * FROM weather_cache WHERE cityId = :cityId LIMIT 1")
     suspend fun getCachedWeather(cityId: String): CachedWeatherEntity?
 
+    @Query("SELECT * FROM weather_cache ORDER BY lastUpdated DESC LIMIT 1")
+    suspend fun getLatestCachedWeather(): CachedWeatherEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCachedWeather(cache: CachedWeatherEntity)
 
